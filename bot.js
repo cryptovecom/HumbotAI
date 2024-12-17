@@ -2,12 +2,13 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const cheerio = require('cheerio');
+require('dotenv').config();
 
 // Input and output folder paths
 const inputFolder = path.join(__dirname, 'inputfolder');
 const outputFolder = path.join(__dirname, 'outputfolder');
 const API_URL = "https://humbot.ai/api/humbot/v1";
-const API_KEY = "api_key_ff918b75514448949833808250881f8e";
+const API_KEY = process.env.API_KEY;
 let isCompleted = false;
 
 // Send content to the API
