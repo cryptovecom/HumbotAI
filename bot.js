@@ -49,7 +49,7 @@ async function getToResponse(taskId) {
 
             if (statusData?.subtask_status === "completed") {
                 console.log("Task completed successfully!");
-                // console.log(`statusData.output: ${statusData.output}`);
+                console.log(`statusData.output: ${statusData.output}`);
                 return statusData.output;
             } else if (statusData?.subtask_status === "running") {
                 console.log("Task is still running... Waiting for completion.");
@@ -74,7 +74,7 @@ async function processHtmlFile(filePath) {
     // Variables to collect and process
     const tagsToProcess = [];
     let originalText = "";
-    let found = false;
+    let prefixIndex = 1;
 
     // Traverse the DOM
     $('*').each(function () {
@@ -83,9 +83,10 @@ async function processHtmlFile(filePath) {
 
             if (elementText.split(/\s+/).length > 5) {
                 tagsToProcess.push({ element: $(this), text: elementText }); // Store the element and text
-                originalText += `${elementText}\n\n\n`; // Add only the content after the colon
-                
+                originalText += `${elementText}\n\n\n `; // Add only the content after the colon
+                ++prefixIndex;
             }
+
         }
     });
     console.log(`original text: ${originalText}`);
@@ -96,12 +97,11 @@ async function processHtmlFile(filePath) {
         console.log(`taskId: ${taskId}`);
         if (taskId) {
             const updatedContent = await getToResponse(taskId); // Retrieve the processed text
-            console.log(`updatedContent: ${updatedContent}`);
+            console.log(`updatedContent:\n ${updatedContent}`);
             if (updatedContent) {
                 const updatedTexts = updatedContent
-                    .replace(/\n\n\n/g, '\n')
-                    .replace(/\n\n/g, '\n')
-                    .split('\n'); // Split the processed text into lines
+                    .split(/\d+\./); // Split the processed text into lines
+                console.log(`updateTexts:\n ${updatedTexts}`);
                 // Replace content in the DOM
                 tagsToProcess.forEach((item, index) => {
                     const updatedText = updatedTexts[index]?.trim();
@@ -121,9 +121,13 @@ async function processHtmlFile(filePath) {
             console.error("Failed to send text to the API.");
         }
     }
-    
 
-    
+    if ( isCompleted ) {
+        // Write the updated HTML to the output folder
+        const outputPath = path.join(outputFolder, path.basename(filePath));
+        fs.writeFileSync(outputPath, $.html(), 'utf-8');
+        console.log(`Processed and saved: ${outputPath}`);
+    }
 }
 
 
@@ -150,13 +154,6 @@ async function main() {
         const scrapedContent = await processHtmlFile(inputFile);
         // console.log(`scrapedContent: ${scrapedContent}`);
         
-        // if (isCompleted) {
-            const outputPath = path.join(outputFolder, path.basename(filePath));
-            fs.writeFileSync(outputPath, $.html(), 'utf-8');
-            console.log(`Processed and saved: ${outputPath}`);
-            console.log("File Processing Completed!");
-        // }
-        isCompleted = false;
     }
 
 
