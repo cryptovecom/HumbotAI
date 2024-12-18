@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const cheerio = require('cheerio');
+// import franc from "franc";
+// import langs from "langs";
 require('dotenv').config();
 
 // Input and output folder paths
@@ -9,6 +11,20 @@ const inputFolder = path.join(__dirname, 'inputfolder');
 const outputFolder = path.join(__dirname, 'outputfolder');
 const API_URL = "https://humbot.ai/api/humbot/v1";
 const API_KEY = process.env.API_KEY;
+
+// Detect language from text
+async function detectLanguages(originalText) {
+    const { franc } = await import("franc"); // Use named import for franc
+    const langs = (await import("langs")).default;
+
+    const langCode = franc(originalText); // Detect the language code
+    if (langCode === "und") {
+        return "Unknown"; // If undetected
+    }
+
+    const languageObj = langs.where("3", langCode); // Find language name
+    return languageObj ? languageObj.name : "Unknown";
+}
 
 // Send content to the API
 async function sendToApi(text) {
@@ -96,37 +112,40 @@ async function processHtmlFile(filePath) {
 
     // Process the text with the API in batches
     if (originalText.split(/\s+/).length > 0) {
-        const taskId = await sendToApi(originalText); // Send text to API
-        console.log(`taskId: ${taskId}`);
-        if (taskId) {
-            const updatedContent = await getToResponse(taskId); // Retrieve the processed text
-            console.log(`updatedContent:\n ${updatedContent}`);
-            if (updatedContent) {
-                const updatedTexts = updatedContent
-                    .replace(/\n\n\n/g, '\n')
-                    .replace(/\n\n/g, '\n')
-                    .split('\n'); // Split the processed text into lines
-                // Replace content in the DOM
-                tagsToProcess.forEach((item, index) => {
-                    const updatedText = updatedTexts[index]?.trim();
-                    if (updatedText) {
-                        const originalText = item.element.text().trim(); // e.g., "test: this is test"
+        const detectedLanguage = await detectLanguages(originalText);
+        console.log(`detectedLanguage: ${detectedLanguage}`);
+        
+        // const taskId = await sendToApi(originalText); // Send text to API
+        // console.log(`taskId: ${taskId}`);
+        // if (taskId) {
+        //     const updatedContent = await getToResponse(taskId); // Retrieve the processed text
+        //     console.log(`updatedContent:\n ${updatedContent}`);
+        //     if (updatedContent) {
+        //         const updatedTexts = updatedContent
+        //             .replace(/\n\n\n/g, '\n')
+        //             .replace(/\n\n/g, '\n')
+        //             .split('\n'); // Split the processed text into lines
+        //         // Replace content in the DOM
+        //         tagsToProcess.forEach((item, index) => {
+        //             const updatedText = updatedTexts[index]?.trim();
+        //             if (updatedText) {
+        //                 const originalText = item.element.text().trim(); // e.g., "test: this is test"
 
-                        // Extract the prefix (text before the colon)
-                        const prefix = originalText.includes(':')
-                            ? originalText.split(':')[0] + ':' // Get the prefix with the colon
-                            : ''; // If no colon, leave prefix empty
+        //                 // Extract the prefix (text before the colon)
+        //                 const prefix = originalText.includes(':')
+        //                     ? originalText.split(':')[0] + ':' // Get the prefix with the colon
+        //                     : ''; // If no colon, leave prefix empty
 
-                        // Set the updated text with the prefix
-                        item.element.text(`${prefix}${updatedText}`); // Update the DOM element
-                    }
-                });
-            } else {
-                console.error("Failed to retrieve updated content.");
-            }
-        } else {
-            console.error("Failed to send text to the API.");
-        }
+        //                 // Set the updated text with the prefix
+        //                 item.element.text(`${prefix}${updatedText}`); // Update the DOM element
+        //             }
+        //         });
+        //     } else {
+        //         console.error("Failed to retrieve updated content.");
+        //     }
+        // } else {
+        //     console.error("Failed to send text to the API.");
+        // }
     }
 
     // Write the updated HTML to the output folder
