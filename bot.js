@@ -9,14 +9,13 @@ const inputFolder = path.join(__dirname, 'inputfolder');
 const outputFolder = path.join(__dirname, 'outputfolder');
 const API_URL = "https://humbot.ai/api/humbot/v1";
 const API_KEY = process.env.API_KEY;
-let isCompleted = false;
 
 // Send content to the API
 async function sendToApi(text) {
     try {
         const response = await axios.post(`${API_URL}/create`, {
             input: text,
-            model_type: "Advanced"
+            model_type: "Enhanced"
         }, {
             headers: {
                 'api-key': API_KEY,
@@ -81,14 +80,18 @@ async function processHtmlFile(filePath) {
         if ($(this).is('p') || $(this).is('li')) {
             let elementText = $(this).text().trim();
 
-            if (elementText.split(/\s+/).length > 5) {
-                tagsToProcess.push({ element: $(this), text: elementText }); // Store the element and text
-                originalText += `${elementText}\n\n\n `; // Add only the content after the colon
-                ++prefixIndex;
-            }
+            // Extract the part after the colon
+            let contentAfterColon = elementText.includes(':')
+                ? elementText.split(':').slice(1).join(':').trim()
+                : elementText; // If no colon, use the whole text
 
+            if (contentAfterColon.split(/\s+/).length > 5) {
+                tagsToProcess.push({ element: $(this), text: elementText }); // Store the element and text
+                originalText += `${contentAfterColon}\n\n\n`; // Add only the content after the colon
+            }
         }
-    });
+
+   });
     console.log(`original text: ${originalText}`);
 
     // Process the text with the API in batches
@@ -100,20 +103,24 @@ async function processHtmlFile(filePath) {
             console.log(`updatedContent:\n ${updatedContent}`);
             if (updatedContent) {
                 const updatedTexts = updatedContent
-                    .split(/\d+\./); // Split the processed text into lines
-                console.log(`updateTexts:\n ${updatedTexts}`);
+                    .replace(/\n\n\n/g, '\n')
+                    .replace(/\n\n/g, '\n')
+                    .split('\n'); // Split the processed text into lines
                 // Replace content in the DOM
                 tagsToProcess.forEach((item, index) => {
                     const updatedText = updatedTexts[index]?.trim();
                     if (updatedText) {
+                        const originalText = item.element.text().trim(); // e.g., "test: this is test"
+
+                        // Extract the prefix (text before the colon)
+                        const prefix = originalText.includes(':')
+                            ? originalText.split(':')[0] + ':' // Get the prefix with the colon
+                            : ''; // If no colon, leave prefix empty
+
                         // Set the updated text with the prefix
-                        item.element.text(`${updatedText}`); // Update the DOM element
+                        item.element.text(`${prefix}${updatedText}`); // Update the DOM element
                     }
                 });
-
-                // Write the updated HTML to the output folder
-                isCompleted = true;
-                
             } else {
                 console.error("Failed to retrieve updated content.");
             }
@@ -122,12 +129,10 @@ async function processHtmlFile(filePath) {
         }
     }
 
-    if ( isCompleted ) {
-        // Write the updated HTML to the output folder
-        const outputPath = path.join(outputFolder, path.basename(filePath));
-        fs.writeFileSync(outputPath, $.html(), 'utf-8');
-        console.log(`Processed and saved: ${outputPath}`);
-    }
+    // Write the updated HTML to the output folder
+    const outputPath = path.join(outputFolder, path.basename(filePath));
+    fs.writeFileSync(outputPath, $.html(), 'utf-8');
+    console.log(`Processed and saved: ${outputPath}`);
 }
 
 
