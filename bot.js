@@ -31,15 +31,13 @@ async function sendToApi(text, detectedLanguage) {
     try {
         const response = await axios.post(`${API_URL}/create`, {
             input: text,
-            model_type: modelType
+            model_type: Advanced
         }, {
             headers: {
                 'api-key': API_KEY,
                 'Content-Type': 'application/json'
             }
         });
-
-        console.log(response.data?.data?.task_id);
 
         return response.data?.data?.task_id || null;
     } catch (error) {
@@ -102,11 +100,6 @@ async function processHtmlFile(filePath) {
                 elementText += $(this).text().trim() + ' ';
             }
         });
-
-        // // Add the text content directly within this element (if any)
-        // const directText = $(this).clone().children().remove().end().text().trim();
-        // elementText = (directText ? directText + ' ' : '') + elementText.trim();
-        // console.log(`2.directText: ${elementText}`);
     
         let contentAfterColon = elementText;
     
@@ -117,12 +110,16 @@ async function processHtmlFile(filePath) {
                 : elementText; // If no colon, use the whole text
         }
     
-        // Check if all words in contentAfterColon start with an uppercase letter
-        const isTitleCase = contentAfterColon.split(/\s+/).every(word => /^[A-Z]/.test(word));
-        
+        const words = contentAfterColon.split(/\s+/);
+        // Check if all words are fully uppercase
+        const isAllUpperCase = words.every(word => word === word.toUpperCase());
+        // Check if all first letters of words are uppercase (Title Case)
+        const isAllFirstLetterUpperCase = words.every(word => /^[A-Z]/.test(word));
+        // Exclude if all letters are uppercase or all first letters are uppercase
+        const isTitleCase = isAllUpperCase || isAllFirstLetterUpperCase;
     
         // Push into tagsToProcess only if it meets the conditions
-        if (!isTitleCase && contentAfterColon.split(/\s+/).length > 7) {
+        if (!words.includes('Bpost') && !isTitleCase && contentAfterColon.split(/\s+/).length > 7) {
             tagsToProcess.push({ element: $(this), text: elementText }); // Store the element and text
             originalText += `${originalTextIndex+1}. ${contentAfterColon}###\n\n\n`; // Add content (split or not)
             
@@ -137,44 +134,30 @@ async function processHtmlFile(filePath) {
     
 
     
-    console.log(`original text:\n ${originalText}`);
+    // console.log(`original text:\n ${originalText}`);
 
     // Process the text with the API in batches
     if (originalText.split(/\s+/).length > 0) {
         const detectedLanguage = await detectLanguage(originalText);
-        console.log(`detectedLanguage: ${detectedLanguage}`);
+        // console.log(`detectedLanguage: ${detectedLanguage}`);
         
         const taskId = await sendToApi(originalText, detectedLanguage); // Send text to API
         console.log(`taskId: ${taskId}`);
         if (taskId) {
             const updatedContent = await getToResponse(taskId); // Retrieve the processed text
-            console.log(`updatedContent:\n ${updatedContent}`);
+            // console.log(`updatedContent:\n ${updatedContent}`);
 
             if (updatedContent) {
                 const updatedTexts = updatedContent
-                    // .replace(/&amp;&amp;&amp;/g, '&')
-                    // .replace(/&amp; &amp;&amp;/g, '&')
-                    // .replace(/&amp;&amp; &amp;/g, '&')
-                    // .replace(/&amp;&amp;/g, '&')
-                    // .replace(/&amp; &amp;/g, '&')
-                    // .replace(/&amp;/g, '&')
-                    // .replace(/&nbsp;&nbsp;&nbsp;/g, '&')
-                    // .replace(/&nbsp;&nbsp;/g, '&')
-                    // .replace(/&nbsp;/g, '&')
-                    // .replace(/&&&&/g, '&')
                     .replace(/\n\n\n/g, '###')
                     .replace(/\n\n/g, '###')
-                    .replace(/\n/g, '###')
                     .replace(/######/g, '###')
                     .replace(/#####/g, '###')
                     .replace(/####/g, '###')
-                    // .replace(/\n\n\n/g, '\n')
-                    // .replace(/\n\n/g, '\n')
-                    // .split('&\n'); // Split the processed text into lines
                     .split(/###/);
                 // Replace content in the DOM
 
-                console.log(`updatedTexts: ${updatedTexts}`);
+                // console.log(`updatedTexts: ${updatedTexts}`);
 
                 tagsToProcess.forEach((item, index) => {
                     const updatedText = updatedTexts[index]?.trim();
@@ -197,7 +180,6 @@ async function processHtmlFile(filePath) {
                         // Update only the text node without affecting children
                         if (textNode.length > 0) {
                             textNode[0].data = `${prefix} ${updatedText}`; // Replace the text content
-                            console.log(`Updated text for index ${index}: ${textNode[0].data}`);
                         } else {
                             console.warn(`No direct text node found for index ${index}`);
                         }
@@ -233,7 +215,6 @@ async function main() {
         console.error("No HTML files found in the input folder.");
         return;
     }
-    // console.log(`files: ${files}`);
 
     for (const file of files) {
         const inputFile = path.join(inputFolder, file);
