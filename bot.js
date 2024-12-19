@@ -2,8 +2,6 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const cheerio = require('cheerio');
-// import franc from "franc";
-// import langs from "langs";
 require('dotenv').config();
 
 // Input and output folder paths
@@ -91,35 +89,53 @@ async function processHtmlFile(filePath) {
     // Variables to collect and process
     const tagsToProcess = [];
     let originalText = "";
-    let prefixIndex = 1;
+    let originalTextIndex = 0;
 
-    // Traverse the DOM
-    $('*').each(function () {
-        if ($(this).is('p') || $(this).is('li')) {
-            let elementText = $(this).text().trim();
-            let contentAfterColon;
+    $('p, li').each(function () {
+        // Use Cheerio's .contents() to get all child nodes
+        let rawContents = $(this).contents();
     
-            if ($(this).is('li')) {
-                // For 'li' tags, extract the part after the colon
-                contentAfterColon = elementText.includes(':')
-                    ? elementText.split(':').slice(1).join(':').trim()
-                    : elementText; // If no colon, use the whole text
-            } else {
-                // For 'p' tags, use the entire text as is
-                contentAfterColon = elementText;
+        // Filter to retrieve only text nodes (not elements)
+        let elementText = '';
+        rawContents.each(function() {
+            if (this.type === 'text') {
+                elementText += $(this).text().trim() + ' ';
             }
+        });
 
-            // Check if all letters in contentAfterColon are uppercase
-        const isAllUpperCase = /^[^a-z]*$/.test(contentAfterColon);
+        // // Add the text content directly within this element (if any)
+        // const directText = $(this).clone().children().remove().end().text().trim();
+        // elementText = (directText ? directText + ' ' : '') + elementText.trim();
+        // console.log(`2.directText: ${elementText}`);
     
-            if (!isAllUpperCase && contentAfterColon.split(/\s+/).length > 5) {
-                tagsToProcess.push({ element: $(this), text: elementText }); // Store the element and text
-                originalText += `${contentAfterColon}\n\n\n`; // Add content (split or not)
-            }
+        let contentAfterColon = elementText;
+    
+        if ($(this).is('li')) {
+            // For 'li' tags, extract the part after the colon
+            contentAfterColon = elementText.includes(':')
+                ? elementText.split(':').slice(1).join(':').trim()
+                : elementText; // If no colon, use the whole text
         }
+    
+        // Check if all words in contentAfterColon start with an uppercase letter
+        const isTitleCase = contentAfterColon.split(/\s+/).every(word => /^[A-Z]/.test(word));
+        
+    
+        // Push into tagsToProcess only if it meets the conditions
+        if (!isTitleCase && contentAfterColon.split(/\s+/).length > 7) {
+            tagsToProcess.push({ element: $(this), text: elementText }); // Store the element and text
+            originalText += `${originalTextIndex+1}. ${contentAfterColon}###\n\n\n`; // Add content (split or not)
+            
+            console.log(`isTitleCase: ${isTitleCase}`);
+            console.log(`originTextIndex: ${originalTextIndex}, ${contentAfterColon}`);
+            
+            ++originalTextIndex;
+        }
+        
+        // console.log(`3.originalText: ${originalText}`);
     });
+    
 
-    console.log(`tagsToProcess:\n ${tagsToProcess.text}`);
     
     console.log(`original text:\n ${originalText}`);
 
@@ -133,26 +149,58 @@ async function processHtmlFile(filePath) {
         if (taskId) {
             const updatedContent = await getToResponse(taskId); // Retrieve the processed text
             console.log(`updatedContent:\n ${updatedContent}`);
+
             if (updatedContent) {
                 const updatedTexts = updatedContent
-                    .replace(/\n\n\n/g, '\n')
-                    .replace(/\n\n/g, '\n')
-                    .split('\n'); // Split the processed text into lines
+                    // .replace(/&amp;&amp;&amp;/g, '&')
+                    // .replace(/&amp; &amp;&amp;/g, '&')
+                    // .replace(/&amp;&amp; &amp;/g, '&')
+                    // .replace(/&amp;&amp;/g, '&')
+                    // .replace(/&amp; &amp;/g, '&')
+                    // .replace(/&amp;/g, '&')
+                    // .replace(/&nbsp;&nbsp;&nbsp;/g, '&')
+                    // .replace(/&nbsp;&nbsp;/g, '&')
+                    // .replace(/&nbsp;/g, '&')
+                    // .replace(/&&&&/g, '&')
+                    .replace(/\n\n\n/g, '###')
+                    .replace(/\n\n/g, '###')
+                    .replace(/\n/g, '###')
+                    .replace(/######/g, '###')
+                    .replace(/#####/g, '###')
+                    .replace(/####/g, '###')
+                    // .replace(/\n\n\n/g, '\n')
+                    // .replace(/\n\n/g, '\n')
+                    // .split('&\n'); // Split the processed text into lines
+                    .split(/###/);
                 // Replace content in the DOM
+
+                console.log(`updatedTexts: ${updatedTexts}`);
+
                 tagsToProcess.forEach((item, index) => {
                     const updatedText = updatedTexts[index]?.trim();
+                    console.log(`updatedText ${index}: ${updatedText}`);
                     if (updatedText) {
-                        const originalText = item.element.text().trim(); // e.g., "test: this is test"
-                        let prefix = ''; // Default prefix
+                        // Find the text node directly within the current element
+                        const textNode = item.element.contents().filter(function () {
+                            return this.type === 'text'; // Select only text nodes
+                        });
 
+                        let prefix = ''; // Default prefix
                         // Extract the prefix (text before the colon)
                         if (item.element.is('li')) {
-                            prefix = originalText.includes(':')
-                                ? originalText.split(':')[0] + ':' // Get the prefix with the colon
+                            const textContent = textNode[0]?.data || ''; // Access the text content of the text node
+                            prefix = textContent.includes(':')
+                                ? textContent.split(':')[0] + ':' // Get the prefix with the colon
                                 : ''; // If no colon, leave prefix empty
                         }
-                        // Set the updated text with the prefix
-                        item.element.text(`${prefix}${updatedText}`); // Update the DOM element
+                
+                        // Update only the text node without affecting children
+                        if (textNode.length > 0) {
+                            textNode[0].data = `${prefix} ${updatedText}`; // Replace the text content
+                            console.log(`Updated text for index ${index}: ${textNode[0].data}`);
+                        } else {
+                            console.warn(`No direct text node found for index ${index}`);
+                        }
                     }
                 });
             } else {
