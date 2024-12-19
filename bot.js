@@ -31,7 +31,7 @@ async function sendToApi(text, detectedLanguage) {
     try {
         const response = await axios.post(`${API_URL}/create`, {
             input: text,
-            model_type: Advanced
+            model_type: "Advanced"
         }, {
             headers: {
                 'api-key': API_KEY,
@@ -119,12 +119,12 @@ async function processHtmlFile(filePath) {
         const isTitleCase = isAllUpperCase || isAllFirstLetterUpperCase;
     
         // Push into tagsToProcess only if it meets the conditions
-        if (!words.includes('Bpost') && !isTitleCase && contentAfterColon.split(/\s+/).length > 7) {
+        if (!isTitleCase && contentAfterColon.split(/\s+/).length > 7) {
             tagsToProcess.push({ element: $(this), text: elementText }); // Store the element and text
-            originalText += `${originalTextIndex+1}. ${contentAfterColon}###\n\n\n`; // Add content (split or not)
+            originalText += ` \n#${originalTextIndex+1}. ${contentAfterColon}`; // Add content (split or not)
             
-            console.log(`isTitleCase: ${isTitleCase}`);
-            console.log(`originTextIndex: ${originalTextIndex}, ${contentAfterColon}`);
+            // console.log(`isTitleCase: ${isTitleCase}`);
+            // console.log(`originTextIndex: ${originalTextIndex}. ${contentAfterColon}`);
             
             ++originalTextIndex;
         }
@@ -134,7 +134,7 @@ async function processHtmlFile(filePath) {
     
 
     
-    // console.log(`original text:\n ${originalText}`);
+    console.log(`original text:\n ${originalText}`);
 
     // Process the text with the API in batches
     if (originalText.split(/\s+/).length > 0) {
@@ -149,12 +149,12 @@ async function processHtmlFile(filePath) {
 
             if (updatedContent) {
                 const updatedTexts = updatedContent
-                    .replace(/\n\n\n/g, '###')
-                    .replace(/\n\n/g, '###')
-                    .replace(/######/g, '###')
-                    .replace(/#####/g, '###')
-                    .replace(/####/g, '###')
-                    .split(/###/);
+                    // .replace(/\n\n\n/g, '###')
+                    // .replace(/\n\n/g, '###')
+                    // .replace(/######/g, '###')
+                    // .replace(/#####/g, '###')
+                    // .replace(/####/g, '###')
+                    .split(/\d+#\.\s/).filter(part => part.trim() !== '');
                 // Replace content in the DOM
 
                 // console.log(`updatedTexts: ${updatedTexts}`);
